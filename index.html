@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>World Map Pins</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #23263a;
+    --border: #2e3150;
+    --text: #e2e4f0;
+    --muted: #7b7fa0;
+    --accent: #4f8ef7;
+    --danger: #e05c5c;
+    --cat-restaurant: #e05c5c;
+    --cat-cafe: #e8a04a;
+    --cat-bar: #a06be8;
+    --cat-landmark: #4f8ef7;
+    --cat-hotel: #4ab8e8;
+    --cat-other: #6be8a0;
+  }
+
+  body { display: flex; height: 100vh; overflow: hidden; font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); }
+
+  /* ── Sidebar ── */
+  #sidebar {
+    width: 320px; min-width: 320px; height: 100vh;
+    background: var(--surface); border-right: 1px solid var(--border);
+    display: flex; flex-direction: column; transition: margin-left .3s ease; z-index: 10;
+  }
+  #sidebar.collapsed { margin-left: -320px; }
+
+  #sidebar-header {
+    padding: 16px; border-bottom: 1px solid var(--border);
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  #sidebar-header h1 { font-size: 15px; font-weight: 600; letter-spacing: .5px; color: var(--text); }
+
+  #search { width: 100%; padding: 8px 10px; background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 13px; outline: none; }
+  #search::placeholder { color: var(--muted); }
+  #search:focus { border-color: var(--accent); }
+
+  #filter-bar { display: flex; flex-wrap: wrap; gap: 5px; }
+  .filter-btn {
+    padding: 3px 9px; border-radius: 20px; font-size: 11px; font-weight: 600;
+    border: 1px solid transparent; cursor: pointer; background: var(--surface2); color: var(--muted);
+    transition: all .15s;
+  }
+  .filter-btn.active { color: #fff; }
+  .filter-btn[data-cat="all"].active { background: var(--accent); border-color: var(--accent); }
+  .filter-btn[data-cat="restaurant"].active { background: var(--cat-restaurant); border-color: var(--cat-restaurant); }
+  .filter-btn[data-cat="cafe"].active { background: var(--cat-cafe); border-color: var(--cat-cafe); }
+  .filter-btn[data-cat="bar"].active { background: var(--cat-bar); border-color: var(--cat-bar); }
+  .filter-btn[data-cat="landmark"].active { background: var(--cat-landmark); border-color: var(--cat-landmark); }
+  .filter-btn[data-cat="hotel"].active { background: var(--cat-hotel); border-color: var(--cat-hotel); }
+  .filter-btn[data-cat="other"].active { background: var(--cat-other); border-color: var(--cat-other); }
+
+  #io-bar { display: flex; gap: 6px; }
+  .io-btn {
+    flex: 1; padding: 6px; border-radius: 6px; font-size: 12px; font-weight: 600;
+    border: 1px solid var(--border); background: var(--surface2); color: var(--text);
+    cursor: pointer; transition: background .15s;
+  }
+  .io-btn:hover { background: var(--border); }
+
+  #pin-list { flex: 1; overflow-y: auto; padding: 8px; display: flex; flex-direction: column; gap: 6px; }
+  #pin-list::-webkit-scrollbar { width: 5px; }
+  #pin-list::-webkit-scrollbar-track { background: transparent; }
+  #pin-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  .pin-card {
+    background: var(--surface2); border: 1px solid var(--border); border-radius: 8px;
+    padding: 10px 12px; cursor: pointer; transition: border-color .15s;
+    display: flex; flex-direction: column; gap: 3px;
+  }
+  .pin-card:hover { border-color: var(--accent); }
+  .pin-card-top { display: flex; align-items: center; gap: 8px; }
+  .pin-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .pin-card-title { font-size: 13px; font-weight: 600; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pin-card-meta { font-size: 11px; color: var(--muted); display: flex; justify-content: space-between; }
+
+  #empty-state { text-align: center; color: var(--muted); font-size: 13px; margin-top: 40px; line-height: 1.8; }
+
+  /* ── Map wrapper ── */
+  #map-wrap { flex: 1; position: relative; }
+  #map { width: 100%; height: 100%; }
+
+  /* ── Toggle sidebar btn ── */
+  #toggle-sidebar {
+    position: absolute; top: 14px; left: 14px; z-index: 1000;
+    background: var(--surface); border: 1px solid var(--border); color: var(--text);
+    width: 36px; height: 36px; border-radius: 8px; cursor: pointer; font-size: 18px;
+    display: flex; align-items: center; justify-content: center; transition: background .15s;
+  }
+  #toggle-sidebar:hover { background: var(--surface2); }
+
+  /* ── Map layer toggle ── */
+  #layer-toggle {
+    position: absolute; top: 14px; right: 14px; z-index: 1000;
+    background: var(--surface); border: 1px solid var(--border); color: var(--text);
+    padding: 6px 12px; border-radius: 8px; cursor: pointer; font-size: 12px; font-weight: 600;
+    transition: background .15s;
+  }
+  #layer-toggle:hover { background: var(--surface2); }
+
+  /* ── Modal ── */
+  #modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,.6); z-index: 2000;
+    display: flex; align-items: center; justify-content: center;
+    opacity: 0; pointer-events: none; transition: opacity .2s;
+  }
+  #modal-overlay.open { opacity: 1; pointer-events: all; }
+
+  #modal {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+    width: 420px; max-width: 95vw; max-height: 90vh; overflow-y: auto;
+    padding: 24px; display: flex; flex-direction: column; gap: 16px;
+    transform: translateY(16px); transition: transform .2s;
+  }
+  #modal-overlay.open #modal { transform: translateY(0); }
+
+  #modal h2 { font-size: 16px; font-weight: 600; }
+
+  .form-group { display: flex; flex-direction: column; gap: 5px; }
+  .form-group label { font-size: 12px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .5px; }
+
+  .form-input {
+    padding: 8px 10px; background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 6px; color: var(--text); font-size: 13px; outline: none;
+    font-family: inherit;
+  }
+  .form-input:focus { border-color: var(--accent); }
+  select.form-input option { background: var(--surface2); }
+  textarea.form-input { resize: vertical; min-height: 80px; }
+
+  /* Star rating */
+  #star-row { display: flex; gap: 6px; }
+  .star { font-size: 22px; cursor: pointer; color: var(--border); transition: color .1s; user-select: none; }
+  .star.lit { color: #f5c842; }
+
+  .modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
+  .btn {
+    padding: 8px 18px; border-radius: 7px; font-size: 13px; font-weight: 600;
+    border: none; cursor: pointer; transition: opacity .15s;
+  }
+  .btn:hover { opacity: .85; }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-danger { background: var(--danger); color: #fff; }
+  .btn-ghost { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+
+  /* Leaflet overrides */
+  .leaflet-container { background: #0f1117; }
+  .leaflet-control-zoom a { background: var(--surface) !important; color: var(--text) !important; border-color: var(--border) !important; }
+  .leaflet-control-zoom a:hover { background: var(--surface2) !important; }
+  .leaflet-control-attribution { background: rgba(15,17,23,.7) !important; color: var(--muted) !important; font-size: 10px; }
+  .leaflet-control-attribution a { color: var(--muted) !important; }
+</style>
+</head>
+<body>
+
+<!-- Sidebar -->
+<div id="sidebar">
+  <div id="sidebar-header">
+    <h1>📍 Map Pins</h1>
+    <input id="search" type="text" placeholder="Search pins…" />
+    <div id="filter-bar">
+      <button class="filter-btn active" data-cat="all">All</button>
+      <button class="filter-btn" data-cat="restaurant">Restaurant</button>
+      <button class="filter-btn" data-cat="cafe">Cafe</button>
+      <button class="filter-btn" data-cat="bar">Bar</button>
+      <button class="filter-btn" data-cat="landmark">Landmark</button>
+      <button class="filter-btn" data-cat="hotel">Hotel</button>
+      <button class="filter-btn" data-cat="other">Other</button>
+    </div>
+    <div id="io-bar">
+      <button class="io-btn" id="export-btn">⬇ Export JSON</button>
+      <button class="io-btn" id="import-btn">⬆ Import JSON</button>
+      <input type="file" id="import-file" accept=".json" style="display:none" />
+    </div>
+  </div>
+  <div id="pin-list"></div>
+</div>
+
+<!-- Map -->
+<div id="map-wrap">
+  <button id="toggle-sidebar" title="Toggle sidebar">☰</button>
+  <button id="layer-toggle">🛰 Satellite</button>
+  <div id="map"></div>
+</div>
+
+<!-- Modal -->
+<div id="modal-overlay">
+  <div id="modal">
+    <h2 id="modal-title">New Pin</h2>
+    <div class="form-group">
+      <label>Title</label>
+      <input id="f-title" class="form-input" type="text" placeholder="Enter a title…" />
+    </div>
+    <div class="form-group">
+      <label>Date Visited</label>
+      <input id="f-date" class="form-input" type="date" />
+    </div>
+    <div class="form-group">
+      <label>Category</label>
+      <select id="f-cat" class="form-input">
+        <option value="restaurant">Restaurant</option>
+        <option value="cafe">Cafe</option>
+        <option value="bar">Bar</option>
+        <option value="landmark">Landmark</option>
+        <option value="hotel">Hotel</option>
+        <option value="other">Other</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Rating</label>
+      <div id="star-row">
+        <span class="star" data-v="1">★</span>
+        <span class="star" data-v="2">★</span>
+        <span class="star" data-v="3">★</span>
+        <span class="star" data-v="4">★</span>
+        <span class="star" data-v="5">★</span>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Notes</label>
+      <textarea id="f-notes" class="form-input" placeholder="Any notes…"></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-danger" id="delete-btn" style="display:none">Delete</button>
+      <button class="btn btn-ghost" id="cancel-btn">Cancel</button>
+      <button class="btn btn-primary" id="save-btn">Save Pin</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Data ──────────────────────────────────────────────────────────────────────
+const STORAGE_KEY = 'worldmap_pins_v1';
+let pins = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+let markers = {};   // id → leaflet marker
+let editingId = null;
+let pendingLatLng = null;
+let currentRating = 0;
+let activeFilter = 'all';
+
+const CAT_COLORS = {
+  restaurant: '#e05c5c',
+  cafe: '#e8a04a',
+  bar: '#a06be8',
+  landmark: '#4f8ef7',
+  hotel: '#4ab8e8',
+  other: '#6be8a0',
+};
+
+function save() { localStorage.setItem(STORAGE_KEY, JSON.stringify(pins)); }
+
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
+
+// ── Map ───────────────────────────────────────────────────────────────────────
+const map = L.map('map', { zoomControl: true, maxZoom: 22 }).setView([20, 0], 3);
+
+const satelliteTile = L.tileLayer(
+  'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+  { attribution: 'Tiles © Esri', maxZoom: 22, maxNativeZoom: 19 }
+);
+const streetTile = L.tileLayer(
+  'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+  { attribution: '© OpenStreetMap contributors', maxZoom: 22, maxNativeZoom: 19 }
+);
+
+satelliteTile.addTo(map);
+let isSatellite = true;
+
+document.getElementById('layer-toggle').addEventListener('click', () => {
+  if (isSatellite) {
+    map.removeLayer(satelliteTile);
+    streetTile.addTo(map);
+    document.getElementById('layer-toggle').textContent = '🗺 Street';
+  } else {
+    map.removeLayer(streetTile);
+    satelliteTile.addTo(map);
+    document.getElementById('layer-toggle').textContent = '🛰 Satellite';
+  }
+  isSatellite = !isSatellite;
+});
+
+map.on('click', e => {
+  pendingLatLng = e.latlng;
+  editingId = null;
+  openModal(null);
+});
+
+// ── Marker helpers ────────────────────────────────────────────────────────────
+function makeIcon(cat) {
+  const color = CAT_COLORS[cat] || CAT_COLORS.other;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="36" viewBox="0 0 28 36">
+    <path d="M14 0C6.27 0 0 6.27 0 14c0 9.63 14 22 14 22S28 23.63 28 14C28 6.27 21.73 0 14 0z" fill="${color}"/>
+    <circle cx="14" cy="14" r="6" fill="white" opacity="0.9"/>
+  </svg>`;
+  return L.divIcon({
+    html: svg, className: '', iconSize: [28, 36], iconAnchor: [14, 36], popupAnchor: [0, -36]
+  });
+}
+
+function addMarker(pin) {
+  const m = L.marker([pin.lat, pin.lng], { icon: makeIcon(pin.category) }).addTo(map);
+  m.on('click', e => {
+    L.DomEvent.stopPropagation(e);
+    editingId = pin.id;
+    pendingLatLng = null;
+    openModal(pin);
+  });
+  markers[pin.id] = m;
+}
+
+function removeMarker(id) {
+  if (markers[id]) { map.removeLayer(markers[id]); delete markers[id]; }
+}
+
+// ── Modal ─────────────────────────────────────────────────────────────────────
+const overlay = document.getElementById('modal-overlay');
+
+function openModal(pin) {
+  document.getElementById('modal-title').textContent = pin ? 'Edit Pin' : 'New Pin';
+  document.getElementById('f-title').value = pin ? pin.title : '';
+  document.getElementById('f-date').value = pin ? (pin.date || '') : new Date().toISOString().slice(0,10);
+  document.getElementById('f-cat').value = pin ? pin.category : 'landmark';
+  document.getElementById('f-notes').value = pin ? (pin.notes || '') : '';
+  document.getElementById('delete-btn').style.display = pin ? 'block' : 'none';
+  setRating(pin ? (pin.rating || 0) : 0);
+  overlay.classList.add('open');
+  document.getElementById('f-title').focus();
+}
+
+function closeModal() { overlay.classList.remove('open'); editingId = null; pendingLatLng = null; }
+
+document.getElementById('cancel-btn').addEventListener('click', closeModal);
+overlay.addEventListener('click', e => { if (e.target === overlay) closeModal(); });
+
+document.getElementById('save-btn').addEventListener('click', () => {
+  const title = document.getElementById('f-title').value.trim();
+  if (!title) { document.getElementById('f-title').focus(); return; }
+
+  if (editingId) {
+    const pin = pins.find(p => p.id === editingId);
+    if (!pin) return;
+    pin.title = title;
+    pin.date = document.getElementById('f-date').value;
+    pin.category = document.getElementById('f-cat').value;
+    pin.rating = currentRating;
+    pin.notes = document.getElementById('f-notes').value.trim();
+    removeMarker(pin.id);
+    addMarker(pin);
+  } else {
+    const pin = {
+      id: uid(),
+      lat: pendingLatLng.lat,
+      lng: pendingLatLng.lng,
+      title,
+      date: document.getElementById('f-date').value,
+      category: document.getElementById('f-cat').value,
+      rating: currentRating,
+      notes: document.getElementById('f-notes').value.trim(),
+    };
+    pins.push(pin);
+    addMarker(pin);
+  }
+
+  save();
+  renderList();
+  closeModal();
+});
+
+document.getElementById('delete-btn').addEventListener('click', () => {
+  if (!editingId) return;
+  pins = pins.filter(p => p.id !== editingId);
+  removeMarker(editingId);
+  save();
+  renderList();
+  closeModal();
+});
+
+// ── Stars ─────────────────────────────────────────────────────────────────────
+function setRating(v) {
+  currentRating = v;
+  document.querySelectorAll('.star').forEach(s => {
+    s.classList.toggle('lit', parseInt(s.dataset.v) <= v);
+  });
+}
+
+document.getElementById('star-row').addEventListener('mouseover', e => {
+  if (!e.target.classList.contains('star')) return;
+  const v = parseInt(e.target.dataset.v);
+  document.querySelectorAll('.star').forEach(s => s.classList.toggle('lit', parseInt(s.dataset.v) <= v));
+});
+document.getElementById('star-row').addEventListener('mouseleave', () => setRating(currentRating));
+document.getElementById('star-row').addEventListener('click', e => {
+  if (!e.target.classList.contains('star')) return;
+  setRating(parseInt(e.target.dataset.v));
+});
+
+// ── Sidebar list ──────────────────────────────────────────────────────────────
+function renderList() {
+  const query = document.getElementById('search').value.toLowerCase();
+  const list = document.getElementById('pin-list');
+  list.innerHTML = '';
+
+  const filtered = pins.filter(p => {
+    const matchCat = activeFilter === 'all' || p.category === activeFilter;
+    const matchQ = !query || p.title.toLowerCase().includes(query) || (p.notes||'').toLowerCase().includes(query);
+    return matchCat && matchQ;
+  });
+
+  if (!filtered.length) {
+    list.innerHTML = `<div id="empty-state">No pins yet.<br/>Click anywhere on the map<br/>to drop your first pin.</div>`;
+    return;
+  }
+
+  filtered.forEach(pin => {
+    const card = document.createElement('div');
+    card.className = 'pin-card';
+    const stars = pin.rating ? '★'.repeat(pin.rating) : '';
+    card.innerHTML = `
+      <div class="pin-card-top">
+        <div class="pin-dot" style="background:${CAT_COLORS[pin.category] || CAT_COLORS.other}"></div>
+        <div class="pin-card-title">${escHtml(pin.title)}</div>
+        <span style="font-size:11px;color:#f5c842">${stars}</span>
+      </div>
+      <div class="pin-card-meta">
+        <span>${capitalize(pin.category)}</span>
+        <span>${pin.date || ''}</span>
+      </div>
+    `;
+    card.addEventListener('click', () => {
+      map.flyTo([pin.lat, pin.lng], Math.max(map.getZoom(), 14), { duration: 1 });
+      editingId = pin.id;
+      pendingLatLng = null;
+      openModal(pin);
+    });
+    list.appendChild(card);
+  });
+}
+
+function escHtml(s) { return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function capitalize(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
+
+document.getElementById('search').addEventListener('input', renderList);
+
+document.querySelectorAll('.filter-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    activeFilter = btn.dataset.cat;
+    renderList();
+  });
+});
+
+// ── Toggle sidebar ────────────────────────────────────────────────────────────
+document.getElementById('toggle-sidebar').addEventListener('click', () => {
+  document.getElementById('sidebar').classList.toggle('collapsed');
+  setTimeout(() => map.invalidateSize(), 310);
+});
+
+// ── Export / Import ───────────────────────────────────────────────────────────
+document.getElementById('export-btn').addEventListener('click', () => {
+  const blob = new Blob([JSON.stringify(pins, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'map-pins.json';
+  a.click();
+});
+
+document.getElementById('import-btn').addEventListener('click', () => {
+  document.getElementById('import-file').click();
+});
+
+document.getElementById('import-file').addEventListener('change', e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      const imported = JSON.parse(ev.target.result);
+      if (!Array.isArray(imported)) throw new Error('Invalid format');
+      imported.forEach(p => {
+        if (!pins.find(x => x.id === p.id)) {
+          pins.push(p);
+          addMarker(p);
+        }
+      });
+      save();
+      renderList();
+    } catch { alert('Invalid JSON file.'); }
+  };
+  reader.readAsText(file);
+  e.target.value = '';
+});
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+pins.forEach(addMarker);
+renderList();
+</script>
+</body>
+</html>
