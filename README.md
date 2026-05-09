@@ -1,25 +1,16 @@
 # Revit Line Exporter
 
-A pyRevit addon that sends a selected line from Revit to a REST API.
+A pyRevit addon that exports selected lines from Revit to the bowl backend API as A-Lines, used to generate seating bowls.
 
 ## Setup
 
-1. Add this repo to your pyRevit extensions folder
-2. Fill in `config.json` with your API endpoint and key
+1. Drop the `RevitLineExporter.extension` folder into `%AppData%\pyRevit\Extensions`
+2. Fill in your credentials in `RevitLineExporter.extension/config.json`
 3. Reload pyRevit — a **RevitLineExporter** tab will appear in the ribbon
 
 ## Usage
 
-1. Select a single straight line in Revit
+1. Select one or more connected straight lines in Revit (e.g. all 4 sides of a rectangle)
 2. Click **Send Line** in the RevitLineExporter tab
-3. The line's start/end points are POSTed to your server as JSON
-
-## Payload
-
-```json
-{
-    "element_id": 123456,
-    "start": {"x": 0.0, "y": 0.0, "z": 0.0},
-    "end":   {"x": 10.0, "y": 0.0, "z": 0.0}
-}
-```
+3. Enter a name for the A-Line
+4. The lines are chained into ordered points and POSTed to the backend
