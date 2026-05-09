@@ -2,14 +2,14 @@ import sys
 import os
 import json
 
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', '..', '..', '..', 'lib'))
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', '..', 'lib'))
 
 from collector import get_selected_line
 from serializer import serialize_aline
 from api_client import login, post_aline
 from pyrevit import forms
 
-config_path = os.path.join(os.path.dirname(__file__), '..', '..', '..', '..', '..', 'config.json')
+config_path = os.path.join(os.path.dirname(__file__), '..', '..', '..', 'config.json')
 with open(config_path) as f:
     config = json.load(f)
 
