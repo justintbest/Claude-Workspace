@@ -1,4 +1,5 @@
 {
-    "api_endpoint": "https://your-server.com/api/line",
-    "api_key": "YOUR_API_KEY_HERE"
+    "base_url": "https://bowl-backend-x0jz.onrender.com",
+    "email": "justin_best@gensler.com",
+    "password": "1318"
 }

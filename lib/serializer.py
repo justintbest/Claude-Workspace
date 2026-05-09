@@ -1,9 +1,11 @@
-def serialize_line(element, curve):
+def serialize_aline(element, curve, name):
     start = curve.GetEndPoint(0)
     end = curve.GetEndPoint(1)
-
     return {
-        "element_id": element.Id.IntegerValue,
-        "start": {"x": start.X, "y": start.Y, "z": start.Z},
-        "end":   {"x": end.X,   "y": end.Y,   "z": end.Z}
+        "name": name,
+        "closed": False,
+        "points": [
+            {"x": start.X, "y": start.Y},
+            {"x": end.X,   "y": end.Y},
+        ],
     }
