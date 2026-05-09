@@ -1,4 +1,5 @@
 {
-    "api_endpoint": "https://bowl-backend-x0jz.onrender.com/api/v1/alines",
-    "api_key": "YOUR_API_KEY_HERE"
+    "base_url": "https://bowl-backend-x0jz.onrender.com",
+    "email": "YOUR_EMAIL_HERE",
+    "password": "YOUR_PASSWORD_HERE"
 }
